@@ -18,6 +18,8 @@ const (
 	LONGTERM_STORAGE = "LONGTERM"
 )
 
+const freeTierUsageInGB = 10
+
 func getTableStorageClass(meta *bigquery.TableMetadata) string {
 	activeThreshold := time.Now().AddDate(0, 0, -90)
 	lastModified := meta.LastModifiedTime
@@ -81,7 +83,12 @@ func Tables(ctx context.Context, client providers.ProviderClient) ([]models.Reso
 			}
 
 			storageClass := getTableStorageClass(tableMetadata)
-			monthlyCost := float64(tableMetadata.NumBytes) / (1024 * 1024 * 1024) * getStoragePricingForBigQueryTable()[storageClass]
+			amountOfDataInGB := float64(tableMetadata.NumBytes) / (1024 * 1024 * 1024)
+
+			monthlyCost := 0.0
+			if amountOfDataInGB > freeTierUsageInGB {
+				monthlyCost = (amountOfDataInGB - freeTierUsageInGB) * getStoragePricingForBigQueryTable()[storageClass]
+			}
 
 			resources = append(resources, models.Resource{
 				Provider:   "GCP",
